@@ -23,7 +23,7 @@ class BasicDataset(Dataset):
         return len(self.ids)
 
     @classmethod
-    def preprocess(cls, pil_img, scale):
+    def preprocess(cls, pil_img, scale, round):
         w, h = pil_img.size
         newW, newH = int(scale * w), int(scale * h)
         assert newW > 0 and newH > 0, 'Scale is too small'
@@ -38,6 +38,9 @@ class BasicDataset(Dataset):
         img_trans = img_nd.transpose((2, 0, 1))
         if img_trans.max() > 1:
             img_trans = img_trans / 255
+            
+        if round:
+            img_trans = np.around(img_trans)
 
         return img_trans
 
@@ -56,8 +59,8 @@ class BasicDataset(Dataset):
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
 
-        img = self.preprocess(img, self.scale)
-        mask = self.preprocess(mask, self.scale)
+        img = self.preprocess(img, self.scale, False)
+        mask = self.preprocess(mask, self.scale, True)
 
         return {
             'image': torch.from_numpy(img).type(torch.FloatTensor),
