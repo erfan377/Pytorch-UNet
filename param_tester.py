@@ -24,7 +24,7 @@ for lr_rate in learn_rate:
                               img_scale=scale,
                               val_percent=val / 100, 
                               dir_checkpoint=output_path)
-                result_summary = f'model_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_DICE_{val_score}_E_{epoch}'
+                result_summary = f'model_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_DICE_{val_score}_E_{epoch}\n'
                 print(result_summary)
                 list_results[result_summary] = val_score
                 if val_score > best_model['score']:
