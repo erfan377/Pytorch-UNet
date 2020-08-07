@@ -7,13 +7,13 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-e', '--epochs', metavar='E', type=int, nargs='*', default=5,
+    parser.add_argument('-e', '--epochs', metavar='E', type=int, nargs='*', default=[5],
                         help='Number of epochs', dest='epochs')
-    parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='*', default=1,
+    parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='*', default=[1],
                         help='Batch size', dest='batchsize')
-    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='*', default=0.001,
+    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='*', default=[0.001],
                         help='Learning rate', dest='lr')
-    parser.add_argument('-s', '--scale', dest='scale', type=float, nargs='*', default=0.7,
+    parser.add_argument('-s', '--scale', dest='scale', type=float, nargs='*', default=[0.7],
                         help='Downscaling factor of the images')
     parser.add_argument('-v', '--validation', dest='val', type=float, default=11.0,
                         help='Percent of the data that is used as validation (0-100)')
