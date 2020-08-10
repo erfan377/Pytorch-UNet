@@ -16,10 +16,10 @@ from collections import defaultdict
 base_dir = 'data/imgs_planet/'
 imgs_filenames = [f for f in os.listdir(base_dir)]
 cut_size = 467
-
+print('Start Processing')
 for img_file in imgs_filenames:
         image_id = img_file.split('.')[0] #get image ID
-        im_name = str(int(image_id)) +'.tif'
+        im_name = image_id +'.tif'
         rgba_image = Image.open(base_dir + im_name)
         #turn to RGB
         rgba_image.load()
@@ -28,5 +28,5 @@ for img_file in imgs_filenames:
         #crop to a unanimous size
         background = background.crop((0, 0, cut_size, cut_size)) 
         #size image
-        overlay_path = 'data/imgs/' + str(int(image_id)) + '.jpeg'
+        overlay_path = 'data/imgs/' + image_id + '.jpeg'
         background.save(overlay_path, "JPEG", quality=100)
