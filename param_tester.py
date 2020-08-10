@@ -1,6 +1,7 @@
 from train import train_unet
 import json
 import argparse
+import csv
 
 
 
@@ -17,6 +18,8 @@ def get_args():
                         help='Downscaling factor of the images')
     parser.add_argument('-v', '--validation', dest='val', type=float, default=11.0,
                         help='Percent of the data that is used as validation (0-100)')
+    parser.add_argument('-d', '--directory', dest='dir', type=str, default='checkpoints_test',
+                        help='specify where to save the MODEL.PTH')
 
     return parser.parse_args()
 
@@ -30,7 +33,7 @@ if __name__ == '__main__':
         for lr_rate in args.lr:
             for scale in args.scale:
                 for batch in args.batchsize:
-                    output_path = f'checkpoints_test/checkoints_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}/'
+                    output_path = f'{args.dir}/checkoints_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}/'
                     try:
                         val_score = net_test.train_net(
                                     epochs=epoch,
@@ -53,5 +56,11 @@ if __name__ == '__main__':
                         except SystemExit:
                             os._exit(0)
     print(best_model['properties'])
+    print(best_model['score'])
     with open('mask_filled_results.json', 'w') as fp:
         json.dump(list_results, fp)
+    with open('mask_filled_results.csv', 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['property', 'diceScore'])
+        for key, value in list_results.items():
+            writer.writerow([key, value])
