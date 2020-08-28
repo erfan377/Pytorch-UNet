@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, random_split
 
 class train_unet:
     
-    def __init__(self):
+    def __init__(self, mode='normal'):
         self.dir_img = 'data/imgs/'
         self.dir_mask = 'data/masks/'
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -31,7 +31,11 @@ class train_unet:
         #   - For 1 class and background, use n_classes=1
         #   - For 2 classes, use n_classes=1
         #   - For N > 2 classes, use n_classes=N
-        self.net = UNet(n_channels=3, n_classes=1, bilinear=True)
+        if mode == 'temporal' or mode == 'temporal_augmentation':
+            self.net = UNet(n_channels=12, n_classes=1, bilinear=True)
+        else:
+            self.net = UNet(n_channels=3, n_classes=1, bilinear=True)
+            
         logging.info(f'Network:\n'
                      f'\t{self.net.n_channels} input channels\n'
                      f'\t{self.net.n_classes} output channels (classes)\n'
@@ -50,14 +54,22 @@ class train_unet:
                   save_cp=True,
                   img_scale=0.5,
                   dir_checkpoint='checkpoints/'):
+        
         device = self.device
         net = self.net
-        dataset = BasicDataset(self.dir_img, self.dir_mask, img_scale)
-        n_val = int(len(dataset) * val_percent)
-        n_train = len(dataset) - n_val
-        train, val = random_split(dataset, [n_train, n_val])
-        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
-        val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+        mode = self.mode
+        
+        file_list = [splitext(file)[0] for file in os.listdir(self.dir_img)
+                    if not file.startswith('.')]
+        random.shuffle(file_list)
+        n_val = int(len(file_list) * val_percent)
+        n_train = len(file_list) - n_val
+        train_list = file_list[:n_train]
+        val_list = file_list[n_train:]
+        dataset_train = BasicDataset(train_list, self.dir_img, self.dir_mask, epochs, img_scale, 'train', mode)
+        dataset_val = BasicDataset(val_list, self.dir_img, self.dir_mask, epochs, img_scale, 'val', mode)
+        train_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
+        val_loader = DataLoader(dataset_val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
         writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
         global_step = 0
@@ -126,8 +138,8 @@ class train_unet:
                         else:
                             logging.info('Validation Dice Coeff: {}'.format(val_score))
                             writer.add_scalar('Dice/test', val_score, global_step)
-
-                        writer.add_images('images', imgs, global_step)
+                        if mode != 'temporal' or mode != 'temporal_augmentation':
+                            writer.add_images('images', imgs, global_step)
                         if net.n_classes == 1:
                             writer.add_images('masks/true', true_masks, global_step)
                             writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
