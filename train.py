@@ -1,3 +1,7 @@
+####################################################################
+# Main class for running the training based on each give paramater #
+####################################################################
+
 import argparse
 import logging
 import os
@@ -20,6 +24,12 @@ from torch.utils.data import DataLoader, random_split
 class train_unet:
     
     def __init__(self, mode='normal'):
+        """Initializes the UNET models and the CUDA  device
+
+        Args:
+            mode (str, optional): mode which can be normal,
+                                  augmentation,temporal, and temporal_augmentation
+        """
         self.dir_img = 'data/imgs/'
         self.dir_mask = 'data/masks/'
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -56,11 +66,26 @@ class train_unet:
                   save_cp=True,
                   img_scale=0.5,
                   dir_checkpoint='checkpoints/'):
+        """Runs training based on paramaters on the data
+
+        Args:
+            epochs (int, optional): Number of epochs to run the model. Defaults to 5.
+            batch_size (int, optional): Batchsize number to be taken from model. Defaults to 1.
+            lr (float, optional): Learning rate for stepping. Defaults to 0.001.
+            val_percent (float, optional): Percentage of data to be taken for validation. Defaults to 0.1.
+            save_cp (bool, optional): Save the weights or not. Defaults to True.
+            img_scale (float, optional): Scale percentage of the original image to use. Defaults to 0.5.
+            dir_checkpoint (str, optional): path to save the trained weights. Defaults to 'checkpoints/'.
+
+        Returns:
+            int: best validation score recorded in one training
+        """
         
         device = self.device
         net = self.net
         mode = self.mode
         
+        # Randomly determines the training and validation dataset
         file_list = [os.path.splitext(file)[0] for file in os.listdir(self.dir_img)
                     if not file.startswith('.')]
         random.shuffle(file_list)
@@ -72,7 +97,8 @@ class train_unet:
         dataset_val = BasicDataset(val_list, self.dir_img, self.dir_mask, epochs, img_scale, 'val', mode)
         train_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
         val_loader = DataLoader(dataset_val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
-
+        
+        # Tensorboard initialization
         writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
         global_step = 0
         val_score_list = []
@@ -87,6 +113,7 @@ class train_unet:
             Images scaling:  {img_scale}
         ''')
 
+        # Gradient descent method
         optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=2)
         if net.n_classes > 1:
@@ -96,8 +123,9 @@ class train_unet:
 
         for epoch in range(epochs):
             net.train()
-
             epoch_loss = 0
+            
+            # Progress bar shown on the terminal
             with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
                 for batch in train_loader:
                     imgs = batch['image']
@@ -125,6 +153,8 @@ class train_unet:
 
                     pbar.update(imgs.shape[0])
                     global_step += 1
+                    
+                    # Validation phase
                     if global_step % (n_train // (10 * batch_size)) == 0:
                         for tag, value in net.named_parameters():
                             tag = tag.replace('.', '/')
@@ -141,13 +171,14 @@ class train_unet:
                         else:
                             logging.info('Validation Dice Coeff: {}'.format(val_score))
                             writer.add_scalar('Dice/test', val_score, global_step)
+                        # If temporal, the images can't be added to Tensorboard
                         if mode != 'temporal' and mode != 'temporal_augmentation':
                             writer.add_images('images', imgs, global_step)
                         if net.n_classes == 1:
                             writer.add_images('masks/true', true_masks, global_step)
                             writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
 
-            if save_cp:
+            if save_cp: #saves the trained weights
                 try:
                     os.mkdir(dir_checkpoint)
                     logging.info('Created checkpoint directory')
