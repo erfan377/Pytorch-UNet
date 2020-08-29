@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+import random
 
 import numpy as np
 import torch
@@ -60,7 +61,7 @@ class train_unet:
         net = self.net
         mode = self.mode
         
-        file_list = [splitext(file)[0] for file in os.listdir(self.dir_img)
+        file_list = [os.path.splitext(file)[0] for file in os.listdir(self.dir_img)
                     if not file.startswith('.')]
         random.shuffle(file_list)
         n_val = int(len(file_list) * val_percent)
