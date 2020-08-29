@@ -75,7 +75,7 @@ class train_unet:
 
         writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
         global_step = 0
-
+        val_score_list = []
         logging.info(f'''Starting training:
             Epochs:          {epochs}
             Batch size:      {batch_size}
@@ -131,6 +131,7 @@ class train_unet:
                             writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
                             writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step)
                         val_score = eval_net(net, val_loader, device)
+                        val_score_list.append(val_score)
                         scheduler.step(val_score)
                         writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
@@ -157,4 +158,4 @@ class train_unet:
                 logging.info(f'Checkpoint {epoch + 1} saved !')
 
         writer.close()
-        return val_score
+        return max(val_score_list)
