@@ -24,7 +24,8 @@ class train_unet:
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logging.info(f'Using device {self.device}')
-
+        self.mode = mode
+        
         # Change here to adapt to your data
         # n_channels=3 for RGB images
         # n_classes is the number of probabilities you want to get per pixel
