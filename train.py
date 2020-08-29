@@ -140,7 +140,7 @@ class train_unet:
                         else:
                             logging.info('Validation Dice Coeff: {}'.format(val_score))
                             writer.add_scalar('Dice/test', val_score, global_step)
-                        if mode != 'temporal' or mode != 'temporal_augmentation':
+                        if mode != 'temporal' and mode != 'temporal_augmentation':
                             writer.add_images('images', imgs, global_step)
                         if net.n_classes == 1:
                             writer.add_images('masks/true', true_masks, global_step)
