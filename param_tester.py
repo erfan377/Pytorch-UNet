@@ -1,11 +1,18 @@
+###############################################################
+# Runs training based on list of paramaters given by the user #
+###############################################################
+
 from train import train_unet
 import json
 import argparse
 import csv
 
-
-
 def get_args():
+    """ Define the arguments that user can put in as flags in the terminal
+
+    Returns:
+        list: The list of inputs attached to args paramaters  
+    """
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-e', '--epochs', metavar='E', type=int, nargs='*', default=[5],
@@ -27,10 +34,14 @@ def get_args():
 
 
 if __name__ == '__main__':
+    """ Run by terminal to test and search for a list paramatares producing 
+    best results
+  
+    """
     args = get_args()
     model = train_unet(args.mod)
     best_model = {'score': 0, 'properties' : ''}
-    list_results = {}
+    list_results = {} #store the result of training based on different paramaters
     for epoch in args.epochs:
         for lr_rate in args.lr:
             for scale in args.scale:
@@ -44,8 +55,8 @@ if __name__ == '__main__':
                                     img_scale=scale,
                                     val_percent=args.val / 100, 
                                     dir_checkpoint=output_path)
+                        
                         result_summary = f'model_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}\n'
-                        print(result_summary)
                         list_results[result_summary] = val_score
                         if val_score > best_model['score']:
                             best_model['score'] = val_score
@@ -59,6 +70,7 @@ if __name__ == '__main__':
                             os._exit(0)
     print(best_model['properties'])
     print(best_model['score'])
+    #store the training in 2 formats of json and CSV
     with open('mask_filled_results.json', 'w') as fp:
         json.dump(list_results, fp)
     with open('mask_filled_results.csv', 'w') as csvfile:
