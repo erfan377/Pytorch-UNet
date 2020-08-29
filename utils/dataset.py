@@ -10,14 +10,15 @@ import albumentations as A
 
 
 class BasicDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, scale=1, mode='normal'):
+    def __init__(self, imgs_list, imgs_dir, masks_dir, epochs, scale=1, tag='train', mode='normal'):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.scale = scale
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
         self.mode = mode
-        self.ids = [splitext(file)[0] for file in listdir(imgs_dir)
-                    if not file.startswith('.')]
+        self.ids = imgs_list
+        self.tag = tag
+        
         logging.info(f'Creating dataset with {len(self.ids)} examples')
         if mode == 'augmentation':
             self.augmentation_pipeline = A.Compose([
