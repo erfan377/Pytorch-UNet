@@ -1,3 +1,7 @@
+#########################################
+# Dataset loader class from the folders #
+#########################################
+
 from os.path import splitext
 from os import listdir
 import numpy as np
@@ -20,6 +24,7 @@ class BasicDataset(Dataset):
         self.tag = tag
         
         logging.info(f'Creating dataset with {len(self.ids)} examples')
+        # Different modes of the training defaulted to 'normal'
         if mode == 'augmentation':
             self.augmentation_pipeline = A.Compose([
                 A.HorizontalFlip(p=0.5),
@@ -41,7 +46,8 @@ class BasicDataset(Dataset):
     @classmethod
     def preprocess(cls, pil_img, scale, round):
         w, h = pil_img.size
-        newW, newH = int(scale * w), int(scale * h)
+        # resizes the image based on scaling factor
+        newW, newH = int(scale * w), int(scale * h) 
         assert newW > 0 and newH > 0, 'Scale is too small'
         pil_img = pil_img.resize((newW, newH))
 
@@ -54,7 +60,10 @@ class BasicDataset(Dataset):
         img_trans = img_nd.transpose((2, 0, 1))
         if img_trans.max() > 1:
             img_trans = img_trans / 255
-            
+        
+        # if the scaling factor is too small the mask might lose the binary 
+        # nature of it's values. We make sure in occasions of extreme scaling
+        # the mask still would stay binary by rounding the resized mask values to 1 or 0
         if round:
             img_trans = np.around(img_trans)
 
@@ -75,6 +84,7 @@ class BasicDataset(Dataset):
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
             
+        # Read additional images incase we train on temporal mode
         if self.mode == 'temporal' or self.mode == 'temporal_augmentation':
             img_file2 = glob('data/imgs_jan/' + idx + '.*')
             img_file3 = glob('data/imgs_apr/' + idx + '.*')
@@ -83,16 +93,21 @@ class BasicDataset(Dataset):
             img3 = Image.open(img_file3[0])
             img4 = Image.open(img_file4[0])
         
+        # In case we only have 1 input image for normal and augmentation mode
         if self.mode == 'augmentation' or self.mode == 'normal':
+            # Augments the data for the training dataset
             if self.tag == 'train' and self.mode == 'augmentation':
                 augmented = self.augmentation_pipeline(image = np.array(img), mask = np.array(mask))
                 img = Image.fromarray(augmented['image'])
                 mask = Image.fromarray(augmented['mask'])
-
+            # Runs for validation phase of augmentation mode, 
+            # and training and validation phase of normal mode             
             output_img = self.preprocess(img, self.scale, False)
             output_mask = self.preprocess(mask, self.scale, True)
         
+        # When training happens on temporal mode
         if self.mode == 'temporal_augmentation' or self.mode == 'temporal':
+            # Augments the data for the training dataset
             if self.tag == 'train' and self.mode == 'temporal_augmentation':
                 augmented = self.augmentation_pipeline(image = np.array(img), img2 = np.array(img2), img3 = np.array(img3), img4 = np.array(img4), mask = np.array(mask))
                 img = Image.fromarray(augmented['image'])
@@ -100,14 +115,17 @@ class BasicDataset(Dataset):
                 img3 = Image.fromarray(augmented['img3'])
                 img4 = Image.fromarray(augmented['img4'])
                 mask = Image.fromarray(augmented['mask'])
-            
+            # Runs for validation phase of augmentation mode, 
+            # and training and validation phase of normal mode
             img = self.preprocess(img, self.scale, False)
             img2 = self.preprocess(img2, self.scale, False)
             img3 = self.preprocess(img3, self.scale, False)
             img4 = self.preprocess(img4, self.scale, False)
             output_mask = self.preprocess(mask, self.scale, True)                 
             
-            output_img = np.vstack((img2, img3, img, img4))
+            # Stack images on top. Nor ordered based on the
+            # progression of seasons during the year
+            output_img = np.vstack((img2, img3, img, img4)) 
 
         return {
             'image': torch.from_numpy(output_img).type(torch.FloatTensor),
