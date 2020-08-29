@@ -20,13 +20,15 @@ def get_args():
                         help='Percent of the data that is used as validation (0-100)')
     parser.add_argument('-d', '--directory', dest='dir', type=str, default='checkpoints_test',
                         help='specify where to save the MODEL.PTH')
+    parser.add_argument('-m', '--mode', dest='mod', type=str, default='normal',
+                        help='specify the training mode')
 
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = get_args()
-    net_test = train_unet()
+    model = train_unet(args.mod)
     best_model = {'score': 0, 'properties' : ''}
     list_results = {}
     for epoch in args.epochs:
@@ -35,7 +37,7 @@ if __name__ == '__main__':
                 for batch in args.batchsize:
                     output_path = f'{args.dir}/checkoints_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}/'
                     try:
-                        val_score = net_test.train_net(
+                        val_score = model.train_net(
                                     epochs=epoch,
                                     batch_size=batch,
                                     lr=lr_rate,
