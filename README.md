@@ -5,8 +5,8 @@ Customized implementation of the [U-Net](https://arxiv.org/abs/1505.04597) in Py
 This model has scored a [dice coefficient](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient) of 0.82 so far. This score could be improved with more training, data augmentation, fine tuning, playing with CRF post-processing, and applying more weights on the edges of the masks.
 
 ## Example
-![input and output for a random image in the test dataset](https://github.com/LobellLab/field_segmentation/blob/master/notebooks/viz_crf_overlap/11005880.jpeg)
-![input and output for a random image in the test dataset](https://github.com/LobellLab/field_segmentation/blob/master/notebooks/viz_crf_overlap/11005880_out.png)
+![input a random image in the test dataset](https://github.com/erfan377/Pytorch-UNet/blob/master/ex.jpeg)
+![Output for a random image in the test dataset](https://github.com/erfan377/Pytorch-UNet/blob/master/ex_pred.png)
 
 ## Usage
 **Note : Use Python 3.6 or newer**
