@@ -16,7 +16,7 @@ param_tester.py uses train.py as the training class to run all the combinations 
 
 ```shell script
 > python param_tester.py -h
-usage: train.py [-h] [-e E] [-b [B]] [-l [LR]] [-f LOAD] [-s SCALE] [-v VAL] [-d] [-m]
+usage: param_tester.py [-h] [-e E] [-b [B]] [-l [LR]] [-f LOAD] [-s SCALE] [-v VAL] [-d] [-m]
 
 Train the UNet on images and target masks
 
@@ -44,7 +44,7 @@ optional arguments:
 ```
 By default, the `scale` is 0.5, so if you wish to obtain better results (but use more memory), set it to 1.
 
-The input images and target masks should be in the `data/imgs` and `data/masks` folders respectively.
+The input images and target masks should be in the `data/imgs` and `data/masks` folders respectively. For the temporal modes, make sure you change the directories for different timelines in the `train.py` and `utils/dataset.py` files.
 
 
 ### Prediction
