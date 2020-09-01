@@ -2,7 +2,7 @@
 
 Customized implementation of the [U-Net](https://arxiv.org/abs/1505.04597) in PyTorch for field segmentation of croplands in developing countries from satellite images.
 
-This model has scored a [dice coefficient](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient) of 0.82 so far. This score could be improved with more training, data augmentation, fine tuning, playing with CRF post-processing, and applying more weights on the edges of the masks.
+This model has scored a [dice coefficient](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient) of 0.82 in the temporal mode for the area labels with a learning rate of 0.0001, a batchsize of 16, and 0.7 scaling of the images trained for 10 epochs. This score could be improved with more training, data augmentation, fine tuning, playing with CRF post-processing, and applying more weights on the edges of the masks.
 
 ## Example
 ![input a random image in the test dataset](https://github.com/erfan377/Pytorch-UNet/blob/master/ex.jpeg)
