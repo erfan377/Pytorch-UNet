@@ -6,6 +6,8 @@ from train import train_unet
 import json
 import argparse
 import csv
+import os
+import shutil
 
 def get_args():
     """ Define the arguments that user can put in as flags in the terminal
@@ -15,7 +17,7 @@ def get_args():
     """
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-e', '--epochs', metavar='E', type=int, nargs='*', default=[5],
+    parser.add_argument('-e', '--epochs', metavar='E', type=int, nargs='*', default=[1],
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='*', default=[1],
                         help='Batch size', dest='batchsize')
@@ -47,27 +49,22 @@ if __name__ == '__main__':
             for scale in args.scale:
                 for batch in args.batchsize:
                     output_path = f'{args.dir}/checkoints_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}/'
-                    try:
-                        val_score = model.train_net(
-                                    epochs=epoch,
-                                    batch_size=batch,
-                                    lr=lr_rate,
-                                    img_scale=scale,
-                                    val_percent=args.val / 100, 
-                                    dir_checkpoint=output_path)
-                        
-                        result_summary = f'model_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}\n'
-                        list_results[result_summary] = val_score
-                        if val_score > best_model['score']:
-                            best_model['score'] = val_score
-                            best_model['properties'] = result_summary
-                    except KeyboardInterrupt:
-                        torch.save(net.state_dict(), 'INTERRUPTED.pth')
-                        logging.info('Saved interrupt')
-                        try:
-                            sys.exit(0)
-                        except SystemExit:
-                            os._exit(0)
+                    if os.path.exists(output_path):
+                        shutil.rmtree(output_path)
+                    val_score = model.train_net(
+                                epochs=epoch,
+                                batch_size=batch,
+                                lr=lr_rate,
+                                img_scale=scale,
+                                val_percent=args.val / 100, 
+                                dir_checkpoint=output_path)
+
+                    result_summary = f'model_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}\n'
+                    list_results[result_summary] = val_score
+                    if val_score > best_model['score']:
+                        best_model['score'] = val_score
+                        best_model['properties'] = result_summary
+
     print(best_model['properties'])
     print(best_model['score'])
     #store the training in 2 formats of json and CSV

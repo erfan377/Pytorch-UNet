@@ -30,8 +30,8 @@ class train_unet:
             mode (str, optional): mode which can be normal,
                                   augmentation,temporal, and temporal_augmentation
         """
-        self.dir_img = 'data/imgs/'
-        self.dir_mask = 'data/masks/'
+        self.dir_img = 'data/dicoms/'
+        self.dir_mask = 'data/labels/'
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logging.info(f'Using device {self.device}')
@@ -46,7 +46,7 @@ class train_unet:
         if mode == 'temporal' or mode == 'temporal_augmentation':
             self.net = UNet(n_channels=12, n_classes=1, bilinear=True)
         else:
-            self.net = UNet(n_channels=3, n_classes=1, bilinear=True)
+            self.net = UNet(n_channels=1, n_classes=1, bilinear=True)
             
         logging.info(f'Network:\n'
                      f'\t{self.net.n_channels} input channels\n'
@@ -84,7 +84,7 @@ class train_unet:
         device = self.device
         net = self.net
         mode = self.mode
-        
+
         # Randomly determines the training and validation dataset
         file_list = [os.path.splitext(file)[0] for file in os.listdir(self.dir_img)
                     if not file.startswith('.')]
@@ -124,7 +124,7 @@ class train_unet:
         for epoch in range(epochs):
             net.train()
             epoch_loss = 0
-            
+#             import pdb;pdb.set_trace()
             # Progress bar shown on the terminal
             with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
                 for batch in train_loader:
