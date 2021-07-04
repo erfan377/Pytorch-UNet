@@ -80,9 +80,18 @@ class MIDRCDataset(Dataset):
     img_path, label_path = self.df['path'].iloc[idx], self.df['label_path'].iloc[idx]
     img = torch.load(img_path)
     label = torch.zeros_like(img) # In case we have no labels
+#     print('label path', label_path)
+#     img = img.type(torch.float32).expand(3, img.shape[1], img.shape[2])
+#     if img.ndim == 3:
+#       img = img[None]
 
     if pd.isna(label_path) == False: # Load label if there's a path for it
+#       print('hiiiiii')
+#       print('label', label)
       label = torch.load(label_path)
+#     label = label.type(torch.float32).expand(3, label.shape[1], label.shape[2])
+#     if label.ndim == 3:
+#         label = label[None]
 
     # covid/non-covid
     covid_status = 1 if self.df['label_count'].iloc[idx] > 1 else 0
@@ -182,17 +191,6 @@ class BasicDataset(Dataset):
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
             ],p=1)
-<<<<<<< HEAD
-=======
-#         if mode == 'temporal_augmentation':
-#             self.augmentation_pipeline = A.Compose([
-#                 A.HorizontalFlip(p=0.5),
-#                 A.VerticalFlip(p=0.5),
-#                 A.RandomRotate90(p=0.5),
-#             ],
-#             additional_targets={'img2': 'image', 'img3': 'image', 'img4': 'image'})
-            
->>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
 
     def __len__(self):
         return len(self.ids)
@@ -236,33 +234,14 @@ class BasicDataset(Dataset):
         assert len(img_file) == 1, \
             f'Either no image or multiple images found for the ID {idx}: {img_file}'
         
-<<<<<<< HEAD
         mask = torch.load(mask_file[0])
         img = torch.load(img_file[0])
-=======
-        img = torch.load(img_file[0])
-        if len(mask_file) == 0:
-            mask = torch.zeros_like(img)
-        else:
-            mask = torch.load(mask_file[0])
->>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
+
 
 #         print('img size', img.shape)
 #         print('mask size', mask.shape)
         assert img.shape == mask.shape, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
-<<<<<<< HEAD
-=======
-            
-#         # Read additional images incase we train on temporal mode
-#         if self.mode == 'temporal' or self.mode == 'temporal_augmentation':
-#             img_file2 = glob('data/imgs_jan/' + idx + '.*')
-#             img_file3 = glob('data/imgs_apr/' + idx + '.*')
-#             img_file4 = glob('data/imgs_oct/' + idx + '.*')
-#             img2 = Image.open(img_file2[0])
-#             img3 = Image.open(img_file3[0])
-#             img4 = Image.open(img_file4[0])
->>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
         
         # In case we only have 1 input image for normal and augmentation mode
         if self.mode == 'augmentation' or self.mode == 'normal':
@@ -273,43 +252,10 @@ class BasicDataset(Dataset):
                 mask = Image.fromarray(augmented['mask'])
             # Runs for validation phase of augmentation mode, 
             # and training and validation phase of normal mode             
-<<<<<<< HEAD
             output_img = img
             output_mask = mask
    
 
         return {
             'image': output_img,
-            'mask': output_mask
-=======
-#             output_img = self.preprocess(img, self.scale, False)
-#             output_mask = self.preprocess(mask, self.scale, True)
-#               output_img = img
-#               output_mask = mask
-#         # When training happens on temporal mode
-#         if self.mode == 'temporal_augmentation' or self.mode == 'temporal':
-#             # Augments the data for the training dataset
-#             if self.tag == 'train' and self.mode == 'temporal_augmentation':
-#                 augmented = self.augmentation_pipeline(image = np.array(img), img2 = np.array(img2), img3 = np.array(img3), img4 = np.array(img4), mask = np.array(mask))
-#                 img = Image.fromarray(augmented['image'])
-#                 img2 = Image.fromarray(augmented['img2'])
-#                 img3 = Image.fromarray(augmented['img3'])
-#                 img4 = Image.fromarray(augmented['img4'])
-#                 mask = Image.fromarray(augmented['mask'])
-#             # Runs for validation phase of augmentation mode, 
-#             # and training and validation phase of normal mode
-#             img = self.preprocess(img, self.scale, False)
-#             img2 = self.preprocess(img2, self.scale, False)
-#             img3 = self.preprocess(img3, self.scale, False)
-#             img4 = self.preprocess(img4, self.scale, False)
-#             output_mask = self.preprocess(mask, self.scale, True)                 
-            
-#             # Stack images on top. Nor ordered based on the
-#             # progression of seasons during the year
-#             output_img = np.vstack((img2, img3, img, img4)) 
-
-        return {
-            'image': img,
-            'mask': mask
->>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
-        }
+            'mask': output_mask}
