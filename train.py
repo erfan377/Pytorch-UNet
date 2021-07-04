@@ -18,24 +18,24 @@ from eval import eval_net
 from unet import UNet
 
 from torch.utils.tensorboard import SummaryWriter
-from utils.dataset import BasicDataset
+from utils.dataset import BasicDataset, JAICDataModule
 from torch.utils.data import DataLoader, random_split
 
 class train_unet:
     
-    def __init__(self, mode='normal'):
+    def __init__(self):
         """Initializes the UNET models and the CUDA  device
 
         Args:
             mode (str, optional): mode which can be normal,
                                   augmentation,temporal, and temporal_augmentation
         """
-        self.dir_img = 'data/imgs/'
-        self.dir_mask = 'data/masks/'
+        self.dir_img = '../process_midrc_small/dicoms'
+        self.dir_mask = '../process_midrc_small/labels'
+        self.data_dir = '../process_midrc_small'
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logging.info(f'Using device {self.device}')
-        self.mode = mode
         
         # Change here to adapt to your data
         # n_channels=3 for RGB images
@@ -43,10 +43,8 @@ class train_unet:
         #   - For 1 class and background, use n_classes=1
         #   - For 2 classes, use n_classes=1
         #   - For N > 2 classes, use n_classes=N
-        if mode == 'temporal' or mode == 'temporal_augmentation':
-            self.net = UNet(n_channels=12, n_classes=1, bilinear=True)
-        else:
-            self.net = UNet(n_channels=3, n_classes=1, bilinear=True)
+
+        self.net = UNet(n_channels=1, n_classes=1, bilinear=True)
             
         logging.info(f'Network:\n'
                      f'\t{self.net.n_channels} input channels\n'
@@ -65,6 +63,7 @@ class train_unet:
                   val_percent=0.1,
                   save_cp=True,
                   img_scale=0.5,
+                  augment=False,
                   dir_checkpoint='checkpoints/'):
         """Runs training based on paramaters on the data
 
@@ -83,20 +82,24 @@ class train_unet:
         
         device = self.device
         net = self.net
-        mode = self.mode
         
         # Randomly determines the training and validation dataset
-        file_list = [os.path.splitext(file)[0] for file in os.listdir(self.dir_img)
-                    if not file.startswith('.')]
-        random.shuffle(file_list)
-        n_val = int(len(file_list) * val_percent)
-        n_train = len(file_list) - n_val
-        train_list = file_list[:n_train]
-        val_list = file_list[n_train:]
-        dataset_train = BasicDataset(train_list, self.dir_img, self.dir_mask, epochs, img_scale, 'train', mode)
-        dataset_val = BasicDataset(val_list, self.dir_img, self.dir_mask, epochs, img_scale, 'val', mode)
-        train_loader = DataLoader(dataset_train, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
-        val_loader = DataLoader(dataset_val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+#         file_list = [os.path.splitext(file)[0] for file in os.listdir(self.dir_img)
+#                     if not file.startswith('.')]
+#         random.shuffle(file_list)
+#         n_val = int(len(file_list) * val_percent)
+#         n_train = len(file_list) - n_val
+#         train_list = file_list[:n_train]
+#         val_list = file_list[n_train:]
+
+#         dataset_train = BasicDataset(train_list, self.dir_img, self.dir_mask, epochs, img_scale, 'train', mode)
+#         dataset_val = BasicDataset(val_list, self.dir_img, self.dir_mask, epochs, img_scale, 'val', mode)
+
+        dataset = JAICDataModule(batch_size=batch_size, augment=augment, datadir=self.data_dir)
+        train_loader = dataset.train_dataloader()
+        val_loader = dataset.val_dataloader()
+        n_train = len(train_loader)
+        n_val = len(val_loader)
         
         # Tensorboard initialization
         writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
@@ -128,8 +131,8 @@ class train_unet:
             # Progress bar shown on the terminal
             with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
                 for batch in train_loader:
-                    imgs = batch['image']
-                    true_masks = batch['mask']
+                    imgs = batch['data']
+                    true_masks = batch['label']
                     assert imgs.shape[1] == net.n_channels, \
                         f'Network has been defined with {net.n_channels} input channels, ' \
                         f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
@@ -171,9 +174,8 @@ class train_unet:
                         else:
                             logging.info('Validation Dice Coeff: {}'.format(val_score))
                             writer.add_scalar('Dice/test', val_score, global_step)
-                        # If temporal, the images can't be added to Tensorboard
-                        if mode != 'temporal' and mode != 'temporal_augmentation':
-                            writer.add_images('images', imgs, global_step)
+
+                        writer.add_images('images', imgs, global_step)
                         if net.n_classes == 1:
                             writer.add_images('masks/true', true_masks, global_step)
                             writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
