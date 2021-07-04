@@ -30,9 +30,14 @@ class train_unet:
             mode (str, optional): mode which can be normal,
                                   augmentation,temporal, and temporal_augmentation
         """
+<<<<<<< HEAD
         self.dir_img = '../process_midrc_small/dicoms'
         self.dir_mask = '../process_midrc_small/labels'
         self.data_dir = '../process_midrc_small'
+=======
+        self.dir_img = 'data/dicoms/'
+        self.dir_mask = 'data/labels/'
+>>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logging.info(f'Using device {self.device}')
@@ -43,8 +48,15 @@ class train_unet:
         #   - For 1 class and background, use n_classes=1
         #   - For 2 classes, use n_classes=1
         #   - For N > 2 classes, use n_classes=N
+<<<<<<< HEAD
 
         self.net = UNet(n_channels=1, n_classes=1, bilinear=True)
+=======
+        if mode == 'temporal' or mode == 'temporal_augmentation':
+            self.net = UNet(n_channels=12, n_classes=1, bilinear=True)
+        else:
+            self.net = UNet(n_channels=1, n_classes=1, bilinear=True)
+>>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
             
         logging.info(f'Network:\n'
                      f'\t{self.net.n_channels} input channels\n'
@@ -82,7 +94,12 @@ class train_unet:
         
         device = self.device
         net = self.net
+<<<<<<< HEAD
         
+=======
+        mode = self.mode
+
+>>>>>>> cf1d56122735f32408ef93d41cbdc996f24ef3de
         # Randomly determines the training and validation dataset
 #         file_list = [os.path.splitext(file)[0] for file in os.listdir(self.dir_img)
 #                     if not file.startswith('.')]
@@ -127,7 +144,7 @@ class train_unet:
         for epoch in range(epochs):
             net.train()
             epoch_loss = 0
-            
+#             import pdb;pdb.set_trace()
             # Progress bar shown on the terminal
             with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
                 for batch in train_loader:
