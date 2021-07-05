@@ -28,10 +28,12 @@ def get_args():
                         help='Downscaling factor of the images')
     parser.add_argument('-v', '--validation', dest='val', type=float, default=11.0,
                         help='Percent of the data that is used as validation (0-100)')
-    parser.add_argument('-d', '--directory', dest='dir', type=str, default='checkpoints_test',
+    parser.add_argument('-o', '--output_dir', dest='out', type=str, default='checkpoints_test',
                         help='specify where to save the MODEL.PTH')
-    parser.add_argument('-m', '--mode', dest='mod', type=str, default='normal',
-                        help='specify the training mode')
+    parser.add_argument('-a', '--augment', dest='aug', type=bool, default=False,
+                        help='specify the training augmentation')
+    parser.add_argument('-d', '--data_dir', dest='dir', type=str, default='./data',
+                        help='specify the directory data')
 
     return parser.parse_args()
 
@@ -42,7 +44,7 @@ if __name__ == '__main__':
   
     """
     args = get_args()
-    model = train_unet()
+    model = train_unet(args.dir)
 
     best_model = {'score': 0, 'properties' : ''}
     list_results = {} #store the result of training based on different paramaters
@@ -50,7 +52,7 @@ if __name__ == '__main__':
         for lr_rate in args.lr:
             for scale in args.scale:
                 for batch in args.batchsize:
-                    output_path = f'{args.dir}/checkoints_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}/'
+                    output_path = f'{args.out}/checkoints_LR_{lr_rate}_BS_{batch}_SCALE_{scale}_E_{epoch}/'
                     if os.path.isdir(output_path):
                         shutil.rmtree(output_path) 
                     os.makedirs(output_path)
@@ -60,7 +62,7 @@ if __name__ == '__main__':
                                     batch_size=batch,
                                     lr=lr_rate,
                                     img_scale=scale,
-                                    augment=False,
+                                    augment=args.aug,
                                     val_percent=args.val / 100, 
                                     dir_checkpoint=output_path)
 

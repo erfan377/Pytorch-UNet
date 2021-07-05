@@ -14,16 +14,18 @@ import os
 import logging
 from PIL import Image
 import albumentations as A
+import torchvision.transforms.functional as TF
 import pdb
 
 import rising.transforms as rtr
 from rising.loading import Dataset, DataLoader
 from rising.random import UniformParameter
+from utils.constants import *
 
 class MIDRCDataset(Dataset):
   """A dataset consisting of COVID and non-COVID chest x-rays based on CheXpert and RICORD"""
 
-  def __init__(self, root='./data/', split='train'):
+  def __init__(self, root='./data/', split='train', scale=1):
     """Create a dataset of COVID+/- chest CTs and split into train, val and test.
       Keyword arguments:
       root -- directory including the data and metadata
@@ -31,22 +33,19 @@ class MIDRCDataset(Dataset):
     """
     
     assert(split in ['train', 'val', 'test'])
+    self.split = split
+    self.scale = scale
 
     df = pd.read_csv(os.path.join(root, 'metadata.csv'))
 
     # Creating a balanced dataset of postive and negative examples
     neg_df, pos_df = df[df['label_count'] == 0], df[df['label_count'] > 0]
-    sample_pos, sample_neg = True, False
-    if len(neg_df) > len(pos_df):
-      sample_pos, sample_neg = False, True
-    sample_size = abs(len(neg_df) - len(pos_df))
-    if sample_pos: # sample from postivies if we size of positice is larger
-      pos_df = pos_df.sample(len(pos_df) - sample_size)
-    else:
-      neg_df = neg_df.sample(len(neg_df) - sample_size)
+    minority_data = min(len(neg_df), len(pos_df))
+    pos_df = pos_df.sample(minority_data)
+    neg_df = neg_df.sample(minority_data)
     
     # remove incorrect cxrs (= not cxr)
-#     pos_df = pos_df[~pos_df['sop_instance_uid'].isin(WRONG_CRX)]
+    pos_df = pos_df[~pos_df['sop_instance_uid'].isin(WRONG_CRX)]
 
     # splits
     neg_train, neg_val, neg_test = np.split(
@@ -80,29 +79,41 @@ class MIDRCDataset(Dataset):
     img_path, label_path = self.df['path'].iloc[idx], self.df['label_path'].iloc[idx]
     img = torch.load(img_path)
     label = torch.zeros_like(img) # In case we have no labels
-#     print('label path', label_path)
-#     img = img.type(torch.float32).expand(3, img.shape[1], img.shape[2])
-#     if img.ndim == 3:
-#       img = img[None]
+    
+    img = img.type(torch.float32).expand(3, img.shape[1], img.shape[2])
 
     if pd.isna(label_path) == False: # Load label if there's a path for it
-#       print('hiiiiii')
-#       print('label', label)
       label = torch.load(label_path)
-#     label = label.type(torch.float32).expand(3, label.shape[1], label.shape[2])
-#     if label.ndim == 3:
-#         label = label[None]
-
+    
+#     label = label.type(torch.float32).expand(1, label.shape[1], label.shape[2])
+    
+    img, label = self.preprocess(img, label)
+    
     # covid/non-covid
     covid_status = 1 if self.df['label_count'].iloc[idx] > 1 else 0
 
     return {'data': img.float(),
            'label': label.float()}
 
+  def preprocess(self, img, label):
+        c, w, h = img.shape
+        # resizes the image based on scaling factor
+        newW, newH = int(self.scale * w), int(self.scale * h) 
+        assert newW > 0 and newH > 0, 'Scale is too small'
+        img = TF.resize(img, (newW, newH))
+        label = TF.resize(label, (newW, newH))
+        
+        # if the scaling factor is too small the mask might lose the binary 
+        # nature of it's values. We make sure in occasions of extreme scaling
+        # the mask still would stay binary by rounding the resized mask values to 1 or 0
+        label[label > 0] = 1
+
+        return img, label
+
 class JAICDataModule(DataLoader):
   """A reusable Pytorch Lightning Data Module"""
 
-  def __init__(self, batch_size=32, augment=True, datadir='./data'):
+  def __init__(self, batch_size=32, augment=False, datadir='./data', scale=1.0):
     """Initialize the Data Module.
       Keyword arguments:
       batch_size -- number of samples within a mini-batch
@@ -111,7 +122,7 @@ class JAICDataModule(DataLoader):
 
     self.batch_size = batch_size
     self.augment = augment
-    self.num_workers = 4
+    self.num_workers = 5
     # Augmentation doesn't do anything if augment flag is false
     self.sample_transform = rtr.Compose([
         rtr.DoNothing()
@@ -120,6 +131,7 @@ class JAICDataModule(DataLoader):
       self.sample_transform = rtr.Compose([
         rtr.NormZeroMeanUnitStd(keys=('data', ))
       ])
+    self.scale = scale
     self.data_dir = datadir
     self.setup()
     
@@ -127,8 +139,8 @@ class JAICDataModule(DataLoader):
   def setup(self, *args):
     """Generate the training, validation and test splits."""
 
-    self.train = MIDRCDataset(root=self.data_dir, split='train')
-    self.val = MIDRCDataset(root=self.data_dir, split='val')
+    self.train = MIDRCDataset(root=self.data_dir, split='train', scale=self.scale)
+    self.val = MIDRCDataset(root=self.data_dir, split='val', scale=self.scale)
     self.test = MIDRCDataset(root=self.data_dir, split='test')
 
   def train_dataloader(self):
@@ -139,13 +151,7 @@ class JAICDataModule(DataLoader):
     ])
     
     if self.augment:
-      transforms = rtr.DropoutCompose([
-        rtr.Mirror(1, keys=('data', 'label')), # Horizontal Flip
-        rtr.Mirror(2, keys=('data', 'label')), # Vertical Flip
-        rtr.Rotate([0,0,UniformParameter(0, 360)], degree=True, keys=('data', 'label')),
-        rtr.GammaCorrection(0.5, keys=('data', )),
-        rtr.Scale(UniformParameter(0.7, 1.5), keys=('data', 'label'))
-        ], dropout=0.5, shuffle=True)
+      pass
 
     # construct loader
     return DataLoader(self.train,
@@ -153,7 +159,8 @@ class JAICDataModule(DataLoader):
                             gpu_transforms=transforms,
                             shuffle=True,
                             sample_transforms=self.sample_transform,
-                            num_workers=self.num_workers)
+                            num_workers=self.num_workers, 
+                            pin_memory=True)
 
   def val_dataloader(self):
     """Create a val dataloader."""
@@ -161,7 +168,8 @@ class JAICDataModule(DataLoader):
     return DataLoader(self.val,
                             num_workers=self.num_workers,
                             batch_size=self.batch_size,
-                            sample_transforms=self.sample_transform)
+                            sample_transforms=self.sample_transform,
+                            pin_memory=True)
 
   def test_dataloader(self):
     """Create a test dataloader."""
@@ -169,12 +177,12 @@ class JAICDataModule(DataLoader):
     return DataLoader(self.test,
                             num_workers=self.num_workers,
                             batch_size=self.batch_size,
-                            sample_transforms=self.sample_transform)
+                            sample_transforms=self.sample_transform,
+                            pin_memory=True)
 
 
 class BasicDataset(Dataset):
     def __init__(self, imgs_list, imgs_dir, masks_dir, epochs, scale=1, tag='train', mode='normal'):
-        print('hiiiiiiii')
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.scale = scale
@@ -223,11 +231,8 @@ class BasicDataset(Dataset):
 
     def __getitem__(self, i):
         idx = self.ids[i]
-#         import pdb;pdb.set_trace()
         mask_file = glob(self.masks_dir + idx + '.*')
         img_file = glob(self.imgs_dir + idx + '.*')
-#         print('maks', mask_file)
-#         print('img', img_file)
         
 #         assert len(mask_file) == 1, \
 #             f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
@@ -237,9 +242,6 @@ class BasicDataset(Dataset):
         mask = torch.load(mask_file[0])
         img = torch.load(img_file[0])
 
-
-#         print('img size', img.shape)
-#         print('mask size', mask.shape)
         assert img.shape == mask.shape, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
         

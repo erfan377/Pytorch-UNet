@@ -10,6 +10,7 @@ import random
 
 import numpy as np
 import torch
+import shutil
 import torch.nn as nn
 from torch import optim
 from tqdm import tqdm
@@ -23,16 +24,14 @@ from torch.utils.data import DataLoader, random_split
 
 class train_unet:
     
-    def __init__(self):
+    def __init__(self, data_dir):
         """Initializes the UNET models and the CUDA  device
 
         Args:
             mode (str, optional): mode which can be normal,
                                   augmentation,temporal, and temporal_augmentation
         """
-        self.dir_img = '../process_midrc_small/dicoms'
-        self.dir_mask = '../process_midrc_small/labels'
-        self.data_dir = '../process_midrc_small'
+        self.data_dir = data_dir
         
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -44,7 +43,7 @@ class train_unet:
         #   - For 1 class and background, use n_classes=1
         #   - For 2 classes, use n_classes=1
         #   - For N > 2 classes, use n_classes=N
-        self.net = UNet(n_channels=1, n_classes=1, bilinear=True)
+        self.net = UNet(n_channels=3, n_classes=1, bilinear=True)
             
         logging.info(f'Network:\n'
                      f'\t{self.net.n_channels} input channels\n'
@@ -62,7 +61,7 @@ class train_unet:
                   lr=0.001,
                   val_percent=0.1,
                   save_cp=True,
-                  img_scale=0.5,
+                  img_scale=1,
                   augment=False,
                   dir_checkpoint='checkpoints/'):
         """Runs training based on paramaters on the data
@@ -84,7 +83,7 @@ class train_unet:
         net = self.net
 
         # Randomly determines the training and validation dataset
-        dataset = JAICDataModule(batch_size=batch_size, augment=augment, datadir=self.data_dir)
+        dataset = JAICDataModule(batch_size=batch_size, augment=augment, datadir=self.data_dir, scale=img_scale)
         train_loader = dataset.train_dataloader()
         val_loader = dataset.val_dataloader()
         n_train = len(train_loader)
@@ -120,6 +119,7 @@ class train_unet:
             # Progress bar shown on the terminal
             with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
                 for batch in train_loader:
+                    
                     imgs = batch['data']
                     true_masks = batch['label']
                     assert imgs.shape[1] == net.n_channels, \
@@ -181,3 +181,49 @@ class train_unet:
 
         writer.close()
         return max(val_score_list)
+    
+def get_args():
+    """ Define the arguments that user can put in as flags in the terminal
+
+    Returns:
+        list: The list of inputs attached to args paramaters  
+    """
+    parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('-e', '--epochs', metavar='E', type=int, default=1,
+                        help='Number of epochs', dest='epochs')
+    parser.add_argument('-b', '--batch_size', metavar='B', type=int, default=1,
+                        help='Batch size', dest='batch')
+    parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, default=0.001,
+                        help='Learning rate', dest='lr')
+    parser.add_argument('-s', '--scale', dest='scale', type=float, default=1.0,
+                        help='Downscaling factor of the images')
+    parser.add_argument('-v', '--validation', dest='val', type=float, default=11.0,
+                        help='Percent of the data that is used as validation (0-100)')
+    parser.add_argument('-o', '--output_dir', dest='out', type=str, default='checkpoints_test',
+                        help='specify where to save the MODEL.PTH')
+    parser.add_argument('-a', '--augment', dest='aug', type=bool, default=False,
+                        help='specify the training augmentation')
+    parser.add_argument('-d', '--data_dir', dest='dir', type=str, default='./data',
+                        help='specify the directory data')
+
+    return parser.parse_args()
+
+if __name__ == '__main__':
+    args = get_args()
+    output_path = f'{args.out}/checkoints_LR_{args.lr}_BS_{args.batch}_SCALE_{args.scale}_E_{args.epochs}/'
+    model = train_unet(args.dir)
+    if os.path.isdir(output_path):
+        shutil.rmtree(output_path) 
+    os.makedirs(output_path)
+    model.train_net(
+        epochs=args.epochs,
+        batch_size=args.batch,
+        lr=args.lr,
+        img_scale=args.scale,
+        augment=args.aug,
+        val_percent=args.val / 100, 
+        dir_checkpoint=output_path)
+    
+    
