@@ -121,16 +121,17 @@ class JAICDataModule(DataLoader):
     
     # remove incorrect cxrs (= not cxr)
     pos_df = pos_df[~pos_df['sop_instance_uid'].isin(WRONG_CRX)]
-
+    
+    train_size = 1 - val_size - 0.05
     # splits
     neg_train, neg_val, neg_test = np.split(
       neg_df.sample(frac=1),
-      [int((1-val_size-0.05) * len(neg_df)), int(val_size * len(neg_df))],
+      [int(train_size * len(neg_df)), int((train_size+val_size) * len(neg_df))],
     )
 
     pos_train, pos_val, pos_test = np.split(
       pos_df.sample(frac=1),
-      [int((1-val_size-0.05) * len(pos_df)), int(val_size * len(pos_df))],
+      [int(train_size * len(pos_df)), int((train_size+val_size) * len(pos_df))],
     )
 
     # combine train, val, test sets and reshuffle
@@ -138,7 +139,7 @@ class JAICDataModule(DataLoader):
     val = neg_val.append(pos_val).sample(frac=1).reset_index(drop=True)
     test = neg_test.append(pos_test).sample(frac=1).reset_index(drop=True)
     self.df_all = dict(train=train, val=val, test=test)
-    
+
     self.train = MIDRCDataset(self.df_all, split='train', scale=self.scale)
     self.val = MIDRCDataset(self.df_all, split='val', scale=self.scale)
     self.test = MIDRCDataset(self.df_all, split='test', scale=self.scale)
