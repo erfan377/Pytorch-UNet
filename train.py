@@ -83,7 +83,12 @@ class train_unet:
         net = self.net
 
         # Randomly determines the training and validation dataset
-        dataset = JAICDataModule(batch_size=batch_size, augment=augment, datadir=self.data_dir, scale=img_scale)
+        dataset = JAICDataModule(
+            batch_size=batch_size, 
+            augment=augment, 
+            datadir=self.data_dir, 
+            scale=img_scale, 
+            val_size=val_percent)
         train_loader = dataset.train_dataloader()
         val_loader = dataset.val_dataloader()
         n_train = len(train_loader)
@@ -199,14 +204,15 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('-s', '--scale', dest='scale', type=float, default=1.0,
                         help='Downscaling factor of the images')
-    parser.add_argument('-v', '--validation', dest='val', type=float, default=11.0,
-                        help='Percent of the data that is used as validation (0-100)')
+    parser.add_argument('-v', '--validation', dest='val', type=float, default=0.1,
+                        help='Percent of the data that is used as validation (0-1)')
     parser.add_argument('-o', '--output_dir', dest='out', type=str, default='checkpoints_test',
                         help='specify where to save the MODEL.PTH')
     parser.add_argument('-a', '--augment', dest='aug', type=bool, default=False,
                         help='specify the training augmentation')
     parser.add_argument('-d', '--data_dir', dest='dir', type=str, default='./data',
                         help='specify the directory data')
+    
 
     return parser.parse_args()
 
@@ -223,7 +229,7 @@ if __name__ == '__main__':
         lr=args.lr,
         img_scale=args.scale,
         augment=args.aug,
-        val_percent=args.val / 100, 
+        val_percent=args.val, 
         dir_checkpoint=output_path)
     
     

@@ -25,44 +25,16 @@ from utils.constants import *
 class MIDRCDataset(Dataset):
   """A dataset consisting of COVID and non-COVID chest x-rays based on CheXpert and RICORD"""
 
-  def __init__(self, root='./data/', split='train', scale=1):
+  def __init__(self, df, split='train', scale=1):
     """Create a dataset of COVID+/- chest CTs and split into train, val and test.
       Keyword arguments:
-      root -- directory including the data and metadata
+      df -- df including the data and metadata
       split -- either a train, val, or test split of the data
     """
-    
-    assert(split in ['train', 'val', 'test'])
-    self.split = split
+
+    self.df = df.get(split)
     self.scale = scale
 
-    df = pd.read_csv(os.path.join(root, 'metadata.csv'))
-
-    # Creating a balanced dataset of postive and negative examples
-    neg_df, pos_df = df[df['label_count'] == 0], df[df['label_count'] > 0]
-    minority_data = min(len(neg_df), len(pos_df))
-    pos_df = pos_df.sample(minority_data)
-    neg_df = neg_df.sample(minority_data)
-    
-    # remove incorrect cxrs (= not cxr)
-    pos_df = pos_df[~pos_df['sop_instance_uid'].isin(WRONG_CRX)]
-
-    # splits
-    neg_train, neg_val, neg_test = np.split(
-      neg_df.sample(frac=1),
-      [int(.7 * len(neg_df)), int(.86 * len(neg_df))],
-    )
-
-    pos_train, pos_val, pos_test = np.split(
-      pos_df.sample(frac=1),
-      [int(.7 * len(neg_df)), int(.86 * len(neg_df))],
-    )
-
-    # combine train, val, test sets and reshuffle
-    train = neg_train.append(pos_train).sample(frac=1).reset_index(drop=True)
-    val = neg_val.append(pos_val).sample(frac=1).reset_index(drop=True)
-    test = neg_test.append(pos_test).sample(frac=1).reset_index(drop=True)
-    self.df = dict(train=train, val=val, test=test).get(split)
 
   def __len__(self):
     """Return the number of samples in the dataset."""
@@ -113,13 +85,14 @@ class MIDRCDataset(Dataset):
 class JAICDataModule(DataLoader):
   """A reusable Pytorch Lightning Data Module"""
 
-  def __init__(self, batch_size=32, augment=False, datadir='./data', scale=1.0):
+  def __init__(self, batch_size=32, augment=False, datadir='./data', scale=1.0, val_size=0.1):
     """Initialize the Data Module.
       Keyword arguments:
       batch_size -- number of samples within a mini-batch
       augment -- flag whether to apply augmentation to the training samples
     """
-
+    assert 0 < scale <= 1, 'Scale must be between 0 and 1'
+    
     self.batch_size = batch_size
     self.augment = augment
     self.num_workers = 5
@@ -133,15 +106,42 @@ class JAICDataModule(DataLoader):
       ])
     self.scale = scale
     self.data_dir = datadir
-    self.setup()
+    self.setup(val_size)
     
 
-  def setup(self, *args):
+  def setup(self, val_size):
     """Generate the training, validation and test splits."""
+    df = pd.read_csv(os.path.join(self.data_dir, 'metadata.csv'))
 
-    self.train = MIDRCDataset(root=self.data_dir, split='train', scale=self.scale)
-    self.val = MIDRCDataset(root=self.data_dir, split='val', scale=self.scale)
-    self.test = MIDRCDataset(root=self.data_dir, split='test')
+    # Creating a balanced dataset of postive and negative examples
+    neg_df, pos_df = df[df['label_count'] == 0], df[df['label_count'] > 0]
+    minority_data = min(len(neg_df), len(pos_df))
+    pos_df = pos_df.sample(minority_data)
+    neg_df = neg_df.sample(minority_data)
+    
+    # remove incorrect cxrs (= not cxr)
+    pos_df = pos_df[~pos_df['sop_instance_uid'].isin(WRONG_CRX)]
+
+    # splits
+    neg_train, neg_val, neg_test = np.split(
+      neg_df.sample(frac=1),
+      [int((1-val_size-0.05) * len(neg_df)), int(val_size * len(neg_df))],
+    )
+
+    pos_train, pos_val, pos_test = np.split(
+      pos_df.sample(frac=1),
+      [int((1-val_size-0.05) * len(pos_df)), int(val_size * len(pos_df))],
+    )
+
+    # combine train, val, test sets and reshuffle
+    train = neg_train.append(pos_train).sample(frac=1).reset_index(drop=True)
+    val = neg_val.append(pos_val).sample(frac=1).reset_index(drop=True)
+    test = neg_test.append(pos_test).sample(frac=1).reset_index(drop=True)
+    self.df_all = dict(train=train, val=val, test=test)
+    
+    self.train = MIDRCDataset(self.df_all, split='train', scale=self.scale)
+    self.val = MIDRCDataset(self.df_all, split='val', scale=self.scale)
+    self.test = MIDRCDataset(self.df_all, split='test', scale=self.scale)
 
   def train_dataloader(self):
     """Create a train dataloader."""
@@ -151,7 +151,13 @@ class JAICDataModule(DataLoader):
     ])
     
     if self.augment:
-      pass
+      transforms = rtr.DropoutCompose([
+        rtr.Mirror(1, keys=('data', 'label')), # Horizontal Flip
+        rtr.Mirror(2, keys=('data', 'label')), # Vertical Flip
+        rtr.Rotate([0,0,UniformParameter(0, 360)], degree=True, keys=('data', 'label')),
+        rtr.GammaCorrection(0.5, keys=('data', )),
+        rtr.Scale(UniformParameter(0.7, 1.5), keys=('data', 'label'))
+        ], dropout=0.5, shuffle=True)
 
     # construct loader
     return DataLoader(self.train,
